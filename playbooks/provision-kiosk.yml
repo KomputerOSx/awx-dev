@@ -1,0 +1,136 @@
+---
+- name: Provision Ubuntu kiosk machines
+  hosts: "{{ target_group | default('kiosks') }}"
+  become: true
+  gather_facts: true
+
+  vars:
+    kiosk_session_setup_path: /usr/local/bin/rxterminal-session-setup.sh
+    kiosk_first_login_desktop_path: "{{ kiosk_home }}/.config/autostart/rxterminal-first-login.desktop"
+
+  tasks:
+    - name: Refresh apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install base packages
+      ansible.builtin.apt:
+        name: "{{ kiosk_base_packages }}"
+        state: present
+
+    - name: Install desktop packages
+      ansible.builtin.apt:
+        name: "{{ kiosk_desktop_packages }}"
+        state: present
+      when: kiosk_install_desktop | bool
+
+    - name: Install VM guest packages
+      ansible.builtin.apt:
+        name: "{{ kiosk_vm_guest_packages }}"
+        state: present
+      when: kiosk_vm_guest_packages | length > 0
+
+    - name: Ensure kiosk group exists
+      ansible.builtin.group:
+        name: "{{ kiosk_group }}"
+        state: present
+
+    - name: Ensure kiosk user exists
+      ansible.builtin.user:
+        name: "{{ kiosk_user }}"
+        group: "{{ kiosk_group }}"
+        home: "{{ kiosk_home }}"
+        shell: "{{ kiosk_shell }}"
+        password: "{{ kiosk_password_hash }}"
+        create_home: true
+        append: true
+        groups:
+          - audio
+          - video
+          - plugdev
+        state: present
+
+    - name: Ensure kiosk autostart directory exists
+      ansible.builtin.file:
+        path: "{{ kiosk_home }}/.config/autostart"
+        state: directory
+        owner: "{{ kiosk_user }}"
+        group: "{{ kiosk_group }}"
+        mode: "0755"
+
+    - name: Install RxTerminal repo signing key
+      ansible.builtin.get_url:
+        url: "{{ rxterminal_apt_key_url }}"
+        dest: "{{ rxterminal_apt_keyring_path }}"
+        mode: "0644"
+
+    - name: Configure RxTerminal apt repository
+      ansible.builtin.apt_repository:
+        repo: "{{ rxterminal_apt_repo }}"
+        filename: "{{ rxterminal_apt_repo_filename }}"
+        state: present
+        update_cache: true
+
+    - name: Install RxTerminal package
+      ansible.builtin.apt:
+        name: "{{ rxterminal_package_name }}"
+        state: present
+
+    - name: Install first-login session helper
+      ansible.builtin.copy:
+        src: ../files/rxterminal-session-setup.sh
+        dest: "{{ kiosk_session_setup_path }}"
+        mode: "0755"
+        owner: root
+        group: root
+
+    - name: Install first-login desktop entry
+      ansible.builtin.copy:
+        dest: "{{ kiosk_first_login_desktop_path }}"
+        owner: "{{ kiosk_user }}"
+        group: "{{ kiosk_group }}"
+        mode: "0644"
+        content: |
+          [Desktop Entry]
+          Type=Application
+          Version=1.0
+          Name=RxTerminal First Login Setup
+          Comment=Finalize kiosk user session configuration
+          Exec={{ kiosk_session_setup_path }}
+          Terminal=false
+          X-GNOME-Autostart-enabled=true
+          NoDisplay=true
+
+    - name: Ensure kiosk user owns home directory
+      ansible.builtin.file:
+        path: "{{ kiosk_home }}"
+        state: directory
+        owner: "{{ kiosk_user }}"
+        group: "{{ kiosk_group }}"
+        recurse: true
+
+    - name: Configure GDM autologin
+      ansible.builtin.blockinfile:
+        path: /etc/gdm3/custom.conf
+        marker: "# {mark} ANSIBLE RXTERMINAL KIOSK"
+        insertafter: '^\[daemon\]'
+        block: |
+          AutomaticLoginEnable=true
+          AutomaticLogin={{ kiosk_user }}
+      when: kiosk_enable_autologin | bool
+      notify: Restart gdm
+
+    - name: Disable GDM autologin when requested
+      ansible.builtin.blockinfile:
+        path: /etc/gdm3/custom.conf
+        marker: "# {mark} ANSIBLE RXTERMINAL KIOSK"
+        state: absent
+      when: not kiosk_enable_autologin | bool
+      notify: Restart gdm
+
+  handlers:
+    - name: Restart gdm
+      ansible.builtin.service:
+        name: gdm3
+        state: restarted

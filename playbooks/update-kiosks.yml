@@ -1,0 +1,34 @@
+---
+- name: Update kiosk machines
+  hosts: "{{ target_group | default('kiosks') }}"
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Refresh apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 0
+
+    - name: Upgrade RxTerminal package
+      ansible.builtin.apt:
+        name: "{{ rxterminal_package_name | default('rxterminal') }}"
+        state: latest
+
+    - name: Upgrade operating system packages
+      ansible.builtin.apt:
+        upgrade: dist
+      when: update_os_packages | default(false) | bool
+
+    - name: Check whether reboot is required
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required_file
+
+    - name: Reboot when required
+      ansible.builtin.reboot:
+        reboot_timeout: 1800
+        msg: Reboot triggered by AWX after kiosk updates
+      when:
+        - reboot_if_required | default(true) | bool
+        - reboot_required_file.stat.exists
