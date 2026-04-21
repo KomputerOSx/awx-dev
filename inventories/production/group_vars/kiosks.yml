@@ -11,10 +11,7 @@ kiosk_enable_autologin: true
 kiosk_install_desktop: true
 
 rxterminal_package_name: rxterminal
-rxterminal_apt_repo: "deb [signed-by=/usr/share/keyrings/strixon-archive-key.asc] https://packages.strixon.co.uk stable main"
-rxterminal_apt_repo_filename: strixon-rxterminal
-rxterminal_apt_key_url: https://packages.strixon.co.uk/strixon-archive-key.asc
-rxterminal_apt_keyring_path: /usr/share/keyrings/strixon-archive-key.asc
+rxterminal_install_script_url: https://packages.strixon.co.uk/install-rxterminal.sh
 
 kiosk_base_packages:
   - curl

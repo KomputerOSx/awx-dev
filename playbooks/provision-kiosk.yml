@@ -7,6 +7,7 @@
   vars:
     kiosk_session_setup_path: /usr/local/bin/rxterminal-session-setup.sh
     kiosk_first_login_desktop_path: "{{ kiosk_home }}/.config/autostart/rxterminal-first-login.desktop"
+    rxterminal_install_script_path: /tmp/install-rxterminal.sh
 
   tasks:
     - name: Refresh apt cache
@@ -59,23 +60,19 @@
         group: "{{ kiosk_group }}"
         mode: "0755"
 
-    - name: Install RxTerminal repo signing key
+    - name: Download RxTerminal bootstrap installer
       ansible.builtin.get_url:
-        url: "{{ rxterminal_apt_key_url }}"
-        dest: "{{ rxterminal_apt_keyring_path }}"
-        mode: "0644"
+        url: "{{ rxterminal_install_script_url }}"
+        dest: "{{ rxterminal_install_script_path }}"
+        mode: "0755"
 
-    - name: Configure RxTerminal apt repository
-      ansible.builtin.apt_repository:
-        repo: "{{ rxterminal_apt_repo }}"
-        filename: "{{ rxterminal_apt_repo_filename }}"
-        state: present
-        update_cache: true
-
-    - name: Install RxTerminal package
-      ansible.builtin.apt:
-        name: "{{ rxterminal_package_name }}"
-        state: present
+    - name: Install RxTerminal via bootstrap script
+      ansible.builtin.command:
+        argv:
+          - bash
+          - "{{ rxterminal_install_script_path }}"
+      register: rxterminal_install
+      changed_when: "'is already the newest version' not in (rxterminal_install.stdout | default('') ~ rxterminal_install.stderr | default(''))"
 
     - name: Install first-login session helper
       ansible.builtin.copy:

@@ -36,8 +36,7 @@ Update:
 - `ansible_user`
 - `kiosk_user`
 - `kiosk_password_hash`
-- `rxterminal_apt_repo`
-- `rxterminal_apt_key_url`
+- `rxterminal_install_script_url`
 
 Generate a password hash for the kiosk user with one of these:
 
@@ -84,8 +83,7 @@ It will:
 - install desktop and kiosk dependencies
 - create the kiosk user
 - enable GDM autologin for that user
-- add your RxTerminal APT repository
-- install the `rxterminal` package
+- download and run your RxTerminal bootstrap installer
 - place a one-shot first-login script in the kiosk user's autostart folder
 
 On the first graphical login of the kiosk user, the helper script runs:
