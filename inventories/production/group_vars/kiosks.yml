@@ -14,7 +14,6 @@ rxterminal_package_name: rxterminal
 rxterminal_install_script_url: https://packages.strixon.co.uk/install-rxterminal.sh
 
 kiosk_base_packages:
-  - curl
   - gdm3
   - gnome-shell
   - dbus-x11

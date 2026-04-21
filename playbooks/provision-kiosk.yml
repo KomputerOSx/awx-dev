@@ -15,7 +15,39 @@
         update_cache: true
         cache_valid_time: 3600
 
-    - name: Install base packages
+    - name: Install curl bootstrap dependency
+      ansible.builtin.apt:
+        name:
+          - curl
+        state: present
+
+    - name: Download RxTerminal bootstrap installer
+      ansible.builtin.get_url:
+        url: "{{ rxterminal_install_script_url }}"
+        dest: "{{ rxterminal_install_script_path }}"
+        mode: "0755"
+
+    - name: Install RxTerminal via bootstrap script
+      ansible.builtin.command:
+        argv:
+          - bash
+          - "{{ rxterminal_install_script_path }}"
+      register: rxterminal_install
+      changed_when: "'is already the newest version' not in (rxterminal_install.stdout | default('') ~ rxterminal_install.stderr | default(''))"
+
+    - name: Verify packaged install-ubuntu.sh exists
+      ansible.builtin.stat:
+        path: /opt/RxTerminal/resources/scripts/install-ubuntu.sh
+      register: rxterminal_user_installer
+
+    - name: Fail when packaged install-ubuntu.sh is missing
+      ansible.builtin.assert:
+        that:
+          - rxterminal_user_installer.stat.exists
+          - rxterminal_user_installer.stat.executable
+        fail_msg: "RxTerminal was installed, but /opt/RxTerminal/resources/scripts/install-ubuntu.sh is missing or not executable."
+
+    - name: Install kiosk desktop/session packages
       ansible.builtin.apt:
         name: "{{ kiosk_base_packages }}"
         state: present
@@ -59,20 +91,6 @@
         owner: "{{ kiosk_user }}"
         group: "{{ kiosk_group }}"
         mode: "0755"
-
-    - name: Download RxTerminal bootstrap installer
-      ansible.builtin.get_url:
-        url: "{{ rxterminal_install_script_url }}"
-        dest: "{{ rxterminal_install_script_path }}"
-        mode: "0755"
-
-    - name: Install RxTerminal via bootstrap script
-      ansible.builtin.command:
-        argv:
-          - bash
-          - "{{ rxterminal_install_script_path }}"
-      register: rxterminal_install
-      changed_when: "'is already the newest version' not in (rxterminal_install.stdout | default('') ~ rxterminal_install.stderr | default(''))"
 
     - name: Install first-login session helper
       ansible.builtin.copy:
